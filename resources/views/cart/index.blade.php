@@ -25,7 +25,7 @@
         @else
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                 <!-- Keranjang Belanja (lg:col-span-8) -->
-                <div class="lg:col-span-8 bg-white border border-border rounded-sm shadow-sm overflow-hidden">
+                <div class="lg:col-span-8 bg-white border border-border rounded-sm shadow-sm overflow-hidden" data-track-section="cart_items" data-track-label="Daftar Item Keranjang">
                     <div
                         class="p-6 border-b border-border bg-gray-50/50 hidden sm:grid grid-cols-12 text-[10px] font-bold text-primary uppercase tracking-wider">
                         <div class="col-span-6 flex items-center gap-3">
@@ -138,7 +138,7 @@
                 </div>
 
                 <!-- Order Summary (lg:col-span-4) -->
-                <div class="lg:col-span-4 bg-white border border-border p-6 rounded-sm shadow-sm space-y-6">
+                <div class="lg:col-span-4 bg-white border border-border p-6 rounded-sm shadow-sm space-y-6" data-track-section="cart_summary" data-track-label="Ringkasan Belanja Keranjang">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-primary border-b border-border pb-3">
                         Ringkasan Belanja</h3>
 

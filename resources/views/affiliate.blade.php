@@ -2,7 +2,7 @@
     <x-slot name="title">Program Affiliate</x-slot>
 
     {{-- ===== HEADER HALAMAN ===== --}}
-    <div class="bg-primary text-white py-16 sm:py-20 mb-12 relative overflow-hidden shadow-md">
+    <div class="bg-primary text-white py-16 sm:py-20 mb-12 relative overflow-hidden shadow-md" data-track-section="affiliate_hero" data-track-label="Hero Program Affiliate">
         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
             <span
                 class="inline-block bg-accent text-white text-[11px] font-black px-4 py-1.5 uppercase tracking-widest rounded-full mb-5 shadow-sm">
@@ -42,7 +42,7 @@
         </div>
 
         {{-- ===== APA ITU AFFILIATE ===== --}}
-        <section class="bg-white border border-gray-100 rounded-2xl p-6 sm:p-8 shadow-sm">
+        <section class="bg-white border border-gray-100 rounded-2xl p-6 sm:p-8 shadow-sm" data-track-section="affiliate_intro" data-track-label="Pengenalan Program Affiliate">
             <h2 class="text-xl sm:text-2xl font-black text-primary uppercase tracking-tight mb-4">Apa itu Program
                 Affiliate Record?</h2>
             <p class="text-sm sm:text-base text-gray-600 leading-relaxed">
@@ -55,7 +55,7 @@
         </section>
 
         {{-- ===== CARA KERJA ===== --}}
-        <section>
+        <section data-track-section="affiliate_steps" data-track-label="Cara Kerja Affiliate (3 Langkah)">
             <div class="text-center sm:text-left mb-8">
                 <h2 class="text-xl sm:text-2xl font-black text-primary uppercase tracking-tight">Cara Kerja</h2>
             </div>
@@ -113,7 +113,7 @@
         </section>
 
         {{-- ===== KEUNTUNGAN ===== --}}
-        <section>
+        <section data-track-section="affiliate_benefits" data-track-label="Keuntungan & Simulasi Komisi">
             <div class="text-center sm:text-left mb-8">
                 <h2 class="text-xl sm:text-2xl font-black text-primary uppercase tracking-tight">Keuntungan Program
                     Affiliate</h2>
@@ -142,7 +142,7 @@
         </section>
 
         {{-- ===== CTA BELANJA ===== --}}
-        <section class="bg-primary rounded-2xl p-8 sm:p-12 text-center text-white shadow-xl relative overflow-hidden">
+        <section class="bg-primary rounded-2xl p-8 sm:p-12 text-center text-white shadow-xl relative overflow-hidden" data-track-section="affiliate_cta" data-track-label="CTA Belanja & Gabung Affiliate">
             <div class="max-w-xl mx-auto space-y-5 relative z-10">
                 <h2 class="text-2xl sm:text-2xl font-black uppercase tracking-tight text-white">Mulai Belanja & Dapatkan
                     Kodenya!</h2>

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="scroll-smooth">
     <head>
         <meta charset="utf-8">
@@ -124,6 +124,132 @@
 
 
 
+
+        {{-- ═══════════════════════════════════════════════════════════
+             Dwell Tracker — Web Evaluation System
+             Mencatat berapa lama pengunjung berada di tiap seksi halaman.
+             Data dikirim ke /track/dwell setiap 45 detik atau saat
+             meninggalkan halaman. Minimum 3 detik untuk menghindari noise.
+        ═══════════════════════════════════════════════════════════════ --}}
+        <script>
+        (function () {
+            'use strict';
+
+            var ENDPOINT   = '/track/dwell';
+            var MIN_SECS   = 3;
+            var FLUSH_SECS = 45;
+            var THRESHOLD  = 0.4; // 40 % terlihat
+
+            var dwellMap  = {};   // section_key => { label, seconds, lastIn }
+            var pageTitle = document.title;
+            var pageUrl   = window.location.pathname;
+            var tabActive = document.visibilityState === 'visible';
+
+            // ── Kirim data ke server ───────────────────────────────────
+            function flush(final) {
+                var payload = [];
+
+                Object.keys(dwellMap).forEach(function (key) {
+                    var d = dwellMap[key];
+
+                    // Bila halaman masih aktif dan timer berjalan, hitung sisa
+                    if (tabActive && d.lastIn !== null) {
+                        d.seconds += Math.round((Date.now() - d.lastIn) / 1000);
+                        d.lastIn   = Date.now();
+                    }
+
+                    if (d.seconds >= MIN_SECS) {
+                        payload.push({
+                            section : key,
+                            label   : d.label,
+                            seconds : d.seconds,
+                            page    : pageUrl,
+                        });
+                    }
+
+                    // Reset hitungan setelah flush berkala (bukan flush akhir)
+                    if (!final) d.seconds = 0;
+                });
+
+                if (!payload.length) return;
+
+                var body = JSON.stringify({ items: payload });
+
+                if (navigator.sendBeacon) {
+                    var blob = new Blob([body], { type: 'application/json' });
+                    navigator.sendBeacon(ENDPOINT, blob);
+                } else {
+                    fetch(ENDPOINT, {
+                        method    : 'POST',
+                        headers   : { 'Content-Type': 'application/json' },
+                        body      : body,
+                        keepalive : true,
+                    }).catch(function () {});
+                }
+            }
+
+            // ── IntersectionObserver ───────────────────────────────────
+            function observeAll() {
+                if (!window.IntersectionObserver) return;
+
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        var el  = entry.target;
+                        var key = el.getAttribute('data-track-section');
+                        var lbl = el.getAttribute('data-track-label') || key;
+
+                        if (!dwellMap[key]) {
+                            dwellMap[key] = { label: lbl, seconds: 0, lastIn: null };
+                        }
+
+                        var d = dwellMap[key];
+
+                        if (entry.isIntersecting && tabActive) {
+                            if (d.lastIn === null) d.lastIn = Date.now();
+                        } else {
+                            if (d.lastIn !== null) {
+                                d.seconds += Math.round((Date.now() - d.lastIn) / 1000);
+                                d.lastIn   = null;
+                            }
+                        }
+                    });
+                }, { threshold: THRESHOLD });
+
+                document.querySelectorAll('[data-track-section]').forEach(function (el) {
+                    io.observe(el);
+                });
+            }
+
+            // ── Visibilitas tab ────────────────────────────────────────
+            document.addEventListener('visibilitychange', function () {
+                tabActive = document.visibilityState === 'visible';
+
+                Object.keys(dwellMap).forEach(function (key) {
+                    var d = dwellMap[key];
+                    if (!tabActive && d.lastIn !== null) {
+                        d.seconds += Math.round((Date.now() - d.lastIn) / 1000);
+                        d.lastIn   = null;
+                    }
+                });
+
+                if (!tabActive) flush(false);
+            });
+
+            // ── Flush saat meninggalkan halaman ───────────────────────
+            window.addEventListener('pagehide', function () { flush(true); });
+            window.addEventListener('beforeunload', function () { flush(true); });
+
+            // ── Flush berkala setiap 45 detik ─────────────────────────
+            setInterval(function () { flush(false); }, FLUSH_SECS * 1000);
+
+            // ── Mulai observasi setelah DOM siap ─────────────────────
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', observeAll);
+            } else {
+                observeAll();
+            }
+        }());
+        </script>
         {{-- Skrip dari masing-masing halaman. --}}
         @stack('scripts')
     </body>

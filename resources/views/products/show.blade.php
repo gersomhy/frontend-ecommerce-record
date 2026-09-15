@@ -200,7 +200,7 @@
         <div
             class="grid grid-cols-1 lg:grid-cols-12 gap-12 bg-white border border-border p-6 sm:p-8 rounded-sm shadow-sm">
             <!-- Bagian Kiri: Galeri (lg:col-span-7) -->
-            <div class="lg:col-span-7 space-y-4">
+            <div class="lg:col-span-7 space-y-4" data-track-section="product_gallery" data-track-label="Galeri & Foto Produk">
                 <!-- Tampilkan gambar utama (Full container box) -->
                 <div
                     class="border border-gray-200 bg-white flex items-center justify-center rounded-lg aspect-square overflow-hidden shadow-sm relative group p-1 sm:p-2">
@@ -306,7 +306,7 @@
             </div>
 
             <!-- Bagian Kanan: Detail & Pemesanan (lg:col-span-5) -->
-            <div class="lg:col-span-5 space-y-6">
+            <div class="lg:col-span-5 space-y-6" data-track-section="product_variants" data-track-label="Pilihan Varian & Pemesanan">
                 <div>
                     <span
                         class="bg-primary/10 text-primary text-[10px] font-black px-2.5 py-1 uppercase rounded-sm tracking-wider">
@@ -725,7 +725,7 @@
                         </ul>
                     </div>
 
-                    <div>
+                    <div data-track-section="product_description" data-track-label="Deskripsi & Spesifikasi Produk">
                         <h4 class="text-xs font-bold uppercase tracking-wider text-primary mb-2">Deskripsi Produk</h4>
                         <p class="text-xs text-text-light leading-relaxed">
                             {{ $product->description }}
@@ -755,7 +755,7 @@
         {{-- ════════════════════════════════════════════════════════ --}}
         {{-- Ulasan pembeli                                          --}}
         {{-- ════════════════════════════════════════════════════════ --}}
-        <section class="mt-16" id="ulasan">
+        <section class="mt-16" id="ulasan" data-track-section="product_reviews" data-track-label="Ulasan & Testimoni Pembeli">
             <div class="ulasan-kepala">
                 <h2 class="ulasan-tajuk">Ulasan Pembeli</h2>
                 <div class="ulasan-garis"></div>
@@ -906,7 +906,7 @@
         </section>
 
         <!-- Related Products Section -->
-        <section class="mt-16">
+        <section class="mt-16" data-track-section="related_products" data-track-label="Rekomendasi Produk Serupa">
             <div class="text-center mb-8">
                 <h2 class="text-xl font-black text-primary uppercase tracking-wider">Mungkin yang anda suka</h2>
                 <div class="h-1 w-20 bg-accent mx-auto mt-2"></div>

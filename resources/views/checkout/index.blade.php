@@ -1028,7 +1028,8 @@
             <div class="lg:col-span-8 space-y-4">
                 
                 <!-- 1. KONTAK CARD -->
-                <div class="bg-white border rounded-2xl shadow-sm p-6 {{ $kontakLengkap ? 'border-gray-100' : 'border-accent/40' }}">
+                <div class="bg-white border rounded-2xl shadow-sm p-6 {{ $kontakLengkap ? 'border-gray-100' : 'border-accent/40' }}"
+                     data-track-section="checkout_contact" data-track-label="Checkout - Kontak">
                     <div class="flex items-center justify-between gap-3 mb-5">
                         <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide">
                             <span class="langkah-nomor {{ $kontakLengkap ? 'langkah-selesai' : 'langkah-aktif' }}">
@@ -1185,7 +1186,8 @@
 
                 <!-- 2. PENGIRIMAN & PEMBAYARAN CARD -->
                 <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-5 relative"
-                     :class="!kontakLengkap && 'kartu-terkunci'">
+                     :class="!kontakLengkap && 'kartu-terkunci'"
+                     data-track-section="checkout_shipping" data-track-label="Checkout - Pengiriman &amp; Pembayaran">
 
                     <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide border-b border-gray-50 pb-3 flex items-center gap-2">
                         <span class="langkah-nomor" :class="kontakLengkap ? 'langkah-aktif' : 'langkah-mati'">2</span>
@@ -1499,7 +1501,8 @@
                 </div>
 
                 <!-- 4. KERANJANG CARD -->
-                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-6"
+                     data-track-section="checkout_cart" data-track-label="Checkout - Review Keranjang">
                     <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-5">Keranjang ({{ $cartItems->count() }})</h3>
                     <div class="divide-y divide-gray-100">
                         @foreach($cartItems as $item)
@@ -1557,7 +1560,8 @@
             </div>
 
             <!-- Sidebar Summary (lg:col-span-4) -->
-            <div class="lg:col-span-4 bg-white border border-gray-100 p-6 rounded-2xl shadow-sm space-y-6">
+            <div class="lg:col-span-4 bg-white border border-gray-100 p-6 rounded-2xl shadow-sm space-y-6"
+                 data-track-section="checkout_summary" data-track-label="Checkout - Ringkasan Pembayaran">
                 <h3 class="text-sm font-black text-gray-800 uppercase tracking-wide border-b border-gray-50 pb-3">Total Pembayaran</h3>
                 
                 <div class="space-y-3.5 text-xs">

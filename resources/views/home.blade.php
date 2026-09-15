@@ -1,7 +1,7 @@
 <x-app-layout>
     {{-- ===== BANNER HERO (bagian atas halaman) ===== --}}
     @if($heroBanners->isNotEmpty())
-        <div class="relative mb-12 shadow-sm group select-none"
+        <div class="relative mb-12 shadow-sm group select-none" data-track-section="hero_banner" data-track-label="Hero Banner"
             x-data="{
                 {{-- slideAktif boleh mencapai totalSlide, yaitu posisi slide kembar --}}
                 slideAktif: 0,
@@ -381,7 +381,7 @@
             $durasi = 45;
         @endphp
 
-        <section class="w-full pt-4 pb-16">
+        <section class="w-full pt-4 pb-16" data-track-section="kategori" data-track-label="Kategori Produk">
             <div class="text-center mb-8 px-4">
                 <h2 class="text-2xl font-black text-primary uppercase tracking-wider">Kategori</h2>
                 <div class="h-1 w-20 bg-accent mx-auto mt-2"></div>
@@ -622,7 +622,7 @@
 
         {{-- ===== KOLEKSI UNGGULAN ===== --}}
         @if($featuredProducts->isNotEmpty())
-            <section>
+            <section data-track-section="our_collection" data-track-label="Koleksi Unggulan (Our Collection)">
                 <div class="text-center mb-8">
                     <h2 class="text-2xl font-black text-primary uppercase tracking-wider">Our Collection</h2>
                     <div class="h-1 w-20 bg-accent mx-auto mt-2"></div>
@@ -642,7 +642,7 @@
             $persenKomisi = (int) config('referal.persen_komisi', 3);
         @endphp
 
-        <section class="afil" aria-labelledby="afil-judul">
+        <section class="afil" aria-labelledby="afil-judul" data-track-section="affiliate_home" data-track-label="Program Affiliate (Beranda)">
             {{-- Lapisan dekoratif; tidak dibacakan pembaca layar --}}
             <span class="afil-cahaya afil-cahaya-1" aria-hidden="true"></span>
             <span class="afil-cahaya afil-cahaya-2" aria-hidden="true"></span>
@@ -717,7 +717,7 @@
         </section>
 
         {{-- ===== PRODUK TERBARU ===== --}}
-        <section>
+        <section data-track-section="new_arrivals" data-track-label="Produk Terbaru (New Arrivals)">
             <div class="text-center mb-8">
                 <h2 class="text-2xl font-black text-primary uppercase tracking-wider">New Arrivals</h2>
                 <div class="h-1 w-20 bg-accent mx-auto mt-2"></div>
