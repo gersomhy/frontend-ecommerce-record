@@ -14,9 +14,13 @@ use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\ProductReviewController;
 use App\Http\Controllers\ReturnController;
 use App\Http\Controllers\RpayController;
+use App\Http\Controllers\TrackingController;
 use Illuminate\Support\Facades\Route;
 
 // ─── Halaman Publik (bisa diakses siapa saja) ────────────────────
+
+// Pelacakan durasi atensi seksi website (dwell time)
+Route::post('/track/dwell', [TrackingController::class, 'recordSectionDwell'])->name('track.dwell');
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 

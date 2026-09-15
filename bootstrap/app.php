@@ -64,6 +64,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // peramban, jadi tidak mungkin membawa token CSRF. Keasliannya
             // diperiksa lewat Custom Header di BiteshipWebhookController.
             'webhook/biteship',
+
+            // Pelacakan durasi atensi seksi (dwell time) dikirim via beacon/fetch keepalive saat exit
+            'track/dwell',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
