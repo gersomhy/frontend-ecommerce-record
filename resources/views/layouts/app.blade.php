@@ -137,7 +137,7 @@
 
             var ENDPOINT   = '/track/dwell';
             var MIN_SECS   = 3;
-            var FLUSH_SECS = 45;
+            var FLUSH_SECS = 20; // Flush setiap 20 detik secara realtime
             var THRESHOLD  = 0.4; // 40 % terlihat
 
             var dwellMap  = {};   // section_key => { label, seconds, lastIn }
