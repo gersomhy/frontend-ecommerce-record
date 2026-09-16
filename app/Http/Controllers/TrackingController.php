@@ -16,6 +16,12 @@ class TrackingController extends Controller
     {
         $rawEvents = $request->input('items') ?? $request->input('events') ?? $request->all();
 
+        // Client Hints device info dikirim dari JS (brand/model HP Android asli)
+        $clientDevice = $request->input('device', []);
+        $clientBrand  = trim((string) ($clientDevice['brand']  ?? ''));
+        $clientModel  = trim((string) ($clientDevice['model']  ?? ''));
+        $clientPlatform = trim((string) ($clientDevice['platform'] ?? ''));
+
         // Jika single object (ada section atau section_id langsung di root)
         if (is_array($rawEvents) && (isset($rawEvents['section']) || isset($rawEvents['section_id']))) {
             $rawEvents = [$rawEvents];

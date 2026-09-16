@@ -145,6 +145,25 @@
             var pageUrl   = window.location.pathname;
             var tabActive = document.visibilityState === 'visible';
 
+            // -- Deteksi brand device via Client Hints API ----------------
+            // Chrome 90+ Android bisa mengembalikan model asli HP (SM-A135F,
+            // Redmi Note 11, dll) yang tersembunyi di UA string modern.
+            var deviceHints = { brand: '', model: '', platform: '', mobile: false };
+            if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+                navigator.userAgentData.getHighEntropyValues(['model', 'platform', 'platformVersion', 'brands', 'mobile'])
+                    .then(function (hints) {
+                        var real = (hints.brands || []).filter(function (b) {
+                            return !/not.?a/i.test(b.brand) && !/chromium/i.test(b.brand);
+                        });
+                        deviceHints = {
+                            brand   : real.length ? real[0].brand : '',
+                            model   : hints.model || '',
+                            platform: hints.platform || '',
+                            mobile  : hints.mobile || false,
+                        };
+                    }).catch(function () {});
+            }
+
             // ── Kirim data ke server ───────────────────────────────────
             function flush(final) {
                 var payload = [];
@@ -173,7 +192,7 @@
 
                 if (!payload.length) return;
 
-                var body = JSON.stringify({ items: payload });
+                var body = JSON.stringify({ items: payload, device: deviceHints });
 
                 if (navigator.sendBeacon) {
                     var blob = new Blob([body], { type: 'application/json' });
