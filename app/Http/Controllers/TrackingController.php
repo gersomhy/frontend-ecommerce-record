@@ -10,15 +10,19 @@ class TrackingController extends Controller
 {
     /**
      * Catat durasi waktu pengunjung (dwell time) melihat seksi tertentu di website.
-     * Menerima payload batch (array 'events') maupun single object.
+     * Menerima payload batch (array 'items' atau 'events') maupun single object.
      */
     public function recordSectionDwell(Request $request): JsonResponse
     {
-        $rawEvents = $request->input('events');
+        $rawEvents = $request->input('items') ?? $request->input('events') ?? $request->all();
+
+        // Jika single object (ada section atau section_id langsung di root)
+        if (is_array($rawEvents) && (isset($rawEvents['section']) || isset($rawEvents['section_id']))) {
+            $rawEvents = [$rawEvents];
+        }
 
         if (! is_array($rawEvents)) {
-            // Jika dikirim sebagai objek tunggal
-            $rawEvents = [$request->all()];
+            return response()->json(['status' => 'ignored', 'reason' => 'invalid_payload'], 400);
         }
 
         $recordedCount = 0;
@@ -28,11 +32,11 @@ class TrackingController extends Controller
                 continue;
             }
 
-            $sectionId = trim((string) ($eventData['section_id'] ?? ''));
-            $sectionLabel = trim((string) ($eventData['section_label'] ?? ''));
-            $pageName = trim((string) ($eventData['page_name'] ?? 'Halaman Toko'));
-            $pageUrl = trim((string) ($eventData['page_url'] ?? ''));
-            $duration = (int) ($eventData['duration_seconds'] ?? 0);
+            $sectionId    = trim((string) ($eventData['section'] ?? $eventData['section_id'] ?? ''));
+            $sectionLabel = trim((string) ($eventData['label'] ?? $eventData['section_label'] ?? ''));
+            $pageUrl      = trim((string) ($eventData['page'] ?? $eventData['page_url'] ?? ''));
+            $pageName     = trim((string) ($eventData['page_name'] ?? ($pageUrl ?: 'Halaman Toko')));
+            $duration     = (int) ($eventData['seconds'] ?? $eventData['duration_seconds'] ?? 0);
 
             // Filter validasi: id seksi wajib ada, durasi minimal 3 detik (anti-spam scroll cepat), dan maksimal 1 jam
             if ($sectionId === '' || $duration < 3 || $duration > 3600) {
@@ -40,7 +44,7 @@ class TrackingController extends Controller
             }
 
             if ($sectionLabel === '') {
-                $sectionLabel = ucwords(str_replace('_', ' ', $sectionId));
+                $sectionLabel = ucwords(str_replace(['_', '-'], ' ', $sectionId));
             }
 
             // Format durasi agar ramah dibaca manusia
@@ -59,10 +63,14 @@ class TrackingController extends Controller
                 keterangan: $keterangan,
                 subjek: null,
                 properti: [
+                    'section'            => $sectionId,
                     'section_id'         => $sectionId,
+                    'label'              => $sectionLabel,
                     'section_label'      => $sectionLabel,
+                    'page'               => $pageUrl,
                     'page_name'          => $pageName,
                     'page_url'           => $pageUrl,
+                    'seconds'            => $duration,
                     'duration_seconds'   => $duration,
                     'duration_formatted' => $durationFormatted,
                 ],
