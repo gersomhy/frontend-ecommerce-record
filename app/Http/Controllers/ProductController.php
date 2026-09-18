@@ -4,49 +4,32 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
-use Illuminate\Http\Request;
+use App\Services\ProductCacheService;
 use App\Support\CatatAktivitas;
+use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        private readonly ProductCacheService $cacheService
+    ) {}
+
     /**
      * Tampilkan halaman daftar produk dengan filter dan pencarian.
+     * Data produk diambil dari Redis cache; fallback ke DB jika cache miss.
      */
     public function index(Request $request)
     {
-        // Bintang rata-rata ikut dihitung di kueri yang sama supaya daftar
-        // produk tidak menembak dua kueri tambahan untuk setiap kartunya.
-        $query = Product::active()
-            ->with(['category', 'activeDiscount', 'variants'])
-            ->withAvg('reviewsTampil as bintang_rata', 'rating')
-            ->withCount('reviewsTampil as jumlah_ulasan');
-
-        // Cari produk berdasarkan kata kunci
-        if ($request->filled('search')) {
-            $query->search($request->search);
-        }
-
-        // Saring berdasarkan kategori
-        if ($request->filled('category')) {
-            $query->whereHas('category', function ($q) use ($request) {
-                $q->where('slug', $request->category);
-            });
-        }
-
-        // Urutan tampil produk
-        $sort = $request->get('sort', 'terbaru');
-        $query = match ($sort) {
-            'termurah' => $query->orderBy('price', 'asc'),
-            'termahal' => $query->orderBy('price', 'desc'),
-            'terlaris' => $query->orderBy('stock', 'asc'), // Sementara pakai stok, idealnya pakai jumlah pesanan
-            default => $query->latest(),
-        };
-
-        $products = $query->paginate(12)->withQueryString();
-        $categories = Category::active()->ordered()->get();
+        $products   = $this->cacheService->getKatalogProduk($request);
+        $categories = $this->cacheService->getKategoriSidebar();
+        $sort       = $request->get('sort', 'terbaru');
 
         if ($request->filled('search')) {
-            CatatAktivitas::tulisPencarian($request->search, $products->total(), $request->get('category'));
+            CatatAktivitas::tulisPencarian(
+                $request->search,
+                $products->total(),
+                $request->get('category')
+            );
         }
 
         return view('products.index', compact('products', 'categories', 'sort'));
@@ -54,23 +37,19 @@ class ProductController extends Controller
 
     /**
      * Tampilkan halaman detail satu produk.
+     * Relasi produk di-load langsung (tidak di-cache) karena datanya spesifik
+     * per slug dan sudah dipercepat oleh eager loading.
+     * Produk terkait di-cache via ProductCacheService.
      */
     public function show(Product $product)
     {
         $product->load(['category', 'images', 'variants.activeDiscount', 'activeDiscount']);
         CatatAktivitas::tulisProdukView($product);
 
-        $relatedProducts = Product::active()
-            ->where('category_id', $product->category_id)
-            ->where('id', '!=', $product->id)
-            ->with(['category', 'activeDiscount', 'variants'])
-            ->withAvg('reviewsTampil as bintang_rata', 'rating')
-            ->withCount('reviewsTampil as jumlah_ulasan')
-            ->take(4)
-            ->get();
+        $relatedProducts = $this->cacheService->getRelatedProducts($product);
 
-        // Ulasan produk.
-        // Saringan bintang.
+        // Ulasan produk — tidak di-cache karena bergantung pada filter bintang
+        // dan paginasi yang bervariasi per user.
         $saringBintang = (int) request()->query('bintang', 0);
         if ($saringBintang < 1 || $saringBintang > 5) {
             $saringBintang = 0;

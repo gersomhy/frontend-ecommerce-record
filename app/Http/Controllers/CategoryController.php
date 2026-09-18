@@ -3,34 +3,30 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
-use App\Models\Product;
+use App\Services\ProductCacheService;
 use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
+    public function __construct(
+        private readonly ProductCacheService $cacheService
+    ) {}
+
     /**
      * Tampilkan daftar produk berdasarkan kategori tertentu.
+     * Data produk diambil dari Redis cache per kombinasi (slug, sort, page).
      */
     public function show(Category $category, Request $request)
     {
-        $query = $category->activeProducts()->with(['category', 'activeDiscount', 'variants']);
-
-        // Urutan tampil produk
-        $sort = $request->get('sort', 'terbaru');
-        $query = match ($sort) {
-            'termurah' => $query->orderBy('price', 'asc'),
-            'termahal' => $query->orderBy('price', 'desc'),
-            default => $query->latest(),
-        };
-
-        $products = $query->paginate(12)->withQueryString();
-        $categories = Category::active()->ordered()->get();
+        $products   = $this->cacheService->getKatalogKategori($category, $request);
+        $categories = $this->cacheService->getKategoriSidebar();
+        $sort       = $request->get('sort', 'terbaru');
 
         return view('products.index', [
-            'products' => $products,
-            'categories' => $categories,
+            'products'        => $products,
+            'categories'      => $categories,
             'currentCategory' => $category,
-            'sort' => $sort,
+            'sort'            => $sort,
         ]);
     }
 }
