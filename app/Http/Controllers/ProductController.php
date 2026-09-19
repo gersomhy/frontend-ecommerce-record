@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\Product;
 use App\Services\ProductCacheService;
 use App\Support\CatatAktivitas;
@@ -20,9 +19,8 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $products   = $this->cacheService->getKatalogProduk($request);
-        $categories = $this->cacheService->getKategoriSidebar();
-        $sort       = $request->get('sort', 'terbaru');
+        $products = $this->cacheService->getKatalogProduk($request);
+        $sort     = $request->get('sort', 'terbaru');
 
         if ($request->filled('search')) {
             CatatAktivitas::tulisPencarian(
@@ -32,7 +30,7 @@ class ProductController extends Controller
             );
         }
 
-        return view('products.index', compact('products', 'categories', 'sort'));
+        return view('products.index', compact('products', 'sort'));
     }
 
     /**

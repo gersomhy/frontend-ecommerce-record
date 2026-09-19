@@ -18,13 +18,11 @@ class CategoryController extends Controller
      */
     public function show(Category $category, Request $request)
     {
-        $products   = $this->cacheService->getKatalogKategori($category, $request);
-        $categories = $this->cacheService->getKategoriSidebar();
-        $sort       = $request->get('sort', 'terbaru');
+        $products = $this->cacheService->getKatalogKategori($category, $request);
+        $sort     = $request->get('sort', 'terbaru');
 
         return view('products.index', [
             'products'        => $products,
-            'categories'      => $categories,
             'currentCategory' => $category,
             'sort'            => $sort,
         ]);
