@@ -1,9 +1,16 @@
-@props(['product'])
+@props([
+    'product',
+    'eager' => false,   // Gunakan true untuk produk pertama/above-fold (percepat LCP)
+])
 
 @php
     // Ambil ends_at dari activeDiscount (jika ada dan ada tanggal berakhir)
     $discountEndsAt = $product->activeDiscount?->ends_at;
     $discountEndsAtTimestamp = $discountEndsAt ? $discountEndsAt->timestamp : null;
+
+    // Strategi loading gambar: eager untuk kartu pertama, lazy untuk sisanya
+    $imgLoading       = $eager ? 'eager' : 'lazy';
+    $imgFetchPriority = $eager ? 'high'  : 'auto';
 @endphp
 
 <div class="bg-white border border-border rounded-sm hover:shadow-md transition-all duration-300 flex flex-col group relative p-3 sm:p-4">
@@ -88,7 +95,8 @@
         <img src="{{ $product->image_url }}"
             alt="{{ $product->name }}"
             class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-            loading="lazy"
+            loading="{{ $imgLoading }}"
+            fetchpriority="{{ $imgFetchPriority }}"
             onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&q=80';">
     </a>
 

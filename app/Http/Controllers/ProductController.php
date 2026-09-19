@@ -14,12 +14,9 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        // Bintang rata-rata ikut dihitung di kueri yang sama supaya daftar
-        // produk tidak menembak dua kueri tambahan untuk setiap kartunya.
-        $query = Product::active()
-            ->with(['category', 'activeDiscount', 'variants'])
-            ->withAvg('reviewsTampil as bintang_rata', 'rating')
-            ->withCount('reviewsTampil as jumlah_ulasan');
+        // Lazy loading: data produk diambil langsung tanpa eager loading (with).
+        // Relasi (category, variants, activeDiscount, ulasan) dimuat secara lazy (N+1 query) saat diakses di view.
+        $query = Product::active();
 
         // Cari produk berdasarkan kata kunci
         if ($request->filled('search')) {
@@ -38,7 +35,7 @@ class ProductController extends Controller
         $query = match ($sort) {
             'termurah' => $query->orderBy('price', 'asc'),
             'termahal' => $query->orderBy('price', 'desc'),
-            'terlaris' => $query->orderBy('stock', 'asc'), // Sementara pakai stok, idealnya pakai jumlah pesanan
+            'terlaris' => $query->orderBy('stock', 'asc'),
             default => $query->latest(),
         };
 
@@ -57,15 +54,12 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        $product->load(['category', 'images', 'variants.activeDiscount', 'activeDiscount']);
+        // Lazy loading: tidak memakai $product->load(...) agar relasi dimuat saat diakses
         CatatAktivitas::tulisProdukView($product);
 
         $relatedProducts = Product::active()
             ->where('category_id', $product->category_id)
             ->where('id', '!=', $product->id)
-            ->with(['category', 'activeDiscount', 'variants'])
-            ->withAvg('reviewsTampil as bintang_rata', 'rating')
-            ->withCount('reviewsTampil as jumlah_ulasan')
             ->take(4)
             ->get();
 
@@ -77,7 +71,6 @@ class ProductController extends Controller
         }
 
         $ulasan = $product->reviewsTampil()
-            ->with(['user:id,name', 'orderItem:id,variant_info'])
             ->when($saringBintang > 0, fn ($q) => $q->where('rating', $saringBintang))
             ->latest()
             ->paginate(8, ['*'], 'ulasan');

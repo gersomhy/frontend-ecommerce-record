@@ -18,11 +18,9 @@ class HomeController extends Controller
         // AppServiceProvider (yang sudah menyertakan withCount('activeProducts')).
         $categories = Category::active()->ordered()->get();
         $featuredProducts = Product::active()->featured()
-            ->with(['category', 'activeDiscount', 'variants'])
             ->take(8)
             ->get();
         $newArrivals = Product::active()
-            ->with(['category', 'activeDiscount', 'variants'])
             ->latest()
             ->take(8)
             ->get();

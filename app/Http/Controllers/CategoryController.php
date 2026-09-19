@@ -13,7 +13,8 @@ class CategoryController extends Controller
      */
     public function show(Category $category, Request $request)
     {
-        $query = $category->activeProducts()->with(['category', 'activeDiscount', 'variants']);
+        // Lazy loading: ambil produk kategori tanpa eager loading relasi (with)
+        $query = $category->activeProducts();
 
         // Urutan tampil produk
         $sort = $request->get('sort', 'terbaru');

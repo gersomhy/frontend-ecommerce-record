@@ -79,7 +79,8 @@
                 <!-- Products Grid -->
                 <div class="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
                     @forelse($products as $product)
-                        <x-product-card :product="$product" />
+                        {{-- 2 kartu pertama: eager load gambar untuk mempercepat LCP --}}
+                        <x-product-card :product="$product" :eager="$loop->index < 2" />
                     @empty
                         <div class="col-span-full bg-white border border-border p-12 text-center rounded-sm">
                             <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

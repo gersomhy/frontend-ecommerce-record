@@ -263,4 +263,28 @@ class Product extends Model
     {
         return self::storageUrl($this->image);
     }
+
+    /**
+     * Rating bintang rata-rata (fallback lazy-loading jika tidak di-eager load via withAvg).
+     */
+    public function getBintangRataAttribute(): float
+    {
+        if (array_key_exists('bintang_rata', $this->attributes)) {
+            return (float) $this->attributes['bintang_rata'];
+        }
+
+        return (float) ($this->reviewsTampil()->avg('rating') ?? 0.0);
+    }
+
+    /**
+     * Jumlah ulasan tampil (fallback lazy-loading jika tidak di-eager load via withCount).
+     */
+    public function getJumlahUlasanAttribute(): int
+    {
+        if (array_key_exists('jumlah_ulasan', $this->attributes)) {
+            return (int) $this->attributes['jumlah_ulasan'];
+        }
+
+        return (int) $this->reviewsTampil()->count();
+    }
 }
