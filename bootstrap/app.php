@@ -56,6 +56,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
+        // Catat metrik performa (response time, query count, memory) ke CSV.
+        // Hanya aktif saat BENCHMARK_ENABLED=true di .env.
+        $middleware->web(append: [
+            \App\Http\Middleware\BenchmarkMiddleware::class,
+        ]);
+
         $middleware->validateCsrfTokens(except: [
             'midtrans/callback',
             'checkout/midtrans/callback',
