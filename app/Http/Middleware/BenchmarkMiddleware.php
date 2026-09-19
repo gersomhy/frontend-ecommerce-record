@@ -75,14 +75,20 @@ class BenchmarkMiddleware
     private function writeToCsv(array $data): void
     {
         $path   = storage_path('logs/benchmark.csv');
-        $isNew  = ! file_exists($path);
-        $handle = fopen($path, 'a');
+        $handle = @fopen($path, 'a');
+
+        // Jika terkunci oleh Excel di Windows, alihkan ke file alternatif
+        if (! $handle) {
+            $path   = storage_path('logs/benchmark_' . date('Ymd') . '.csv');
+            $handle = @fopen($path, 'a');
+        }
 
         if (! $handle) {
             return;
         }
 
-        if ($isNew) {
+        // Tulis header jika file baru / kosong
+        if (ftell($handle) === 0) {
             fputcsv($handle, array_keys($data));
         }
 
