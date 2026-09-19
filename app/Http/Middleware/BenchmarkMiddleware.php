@@ -8,53 +8,55 @@ use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Middleware Benchmark — mencatat metrik performa ke CSV.
+ * Middleware Benchmark — mengukur metrik performa dan menyisipkannya
+ * sebagai response header X-Benchmark-* DAN mencatatnya ke CSV.
  *
- * Metrik yang dicatat:
- *   timestamp      – waktu request (ISO 8601)
- *   branch         – nilai env BENCHMARK_BRANCH (mis. "lazy-nocache")
- *   url            – path yang diakses
- *   method         – HTTP method
- *   status         – HTTP status code
- *   response_time  – waktu total server memproses request (ms)
- *   query_count    – jumlah query DB yang dieksekusi
- *   query_time_ms  – total waktu eksekusi semua query (ms)
- *   memory_peak_mb – penggunaan memory PHP tertinggi selama request (MB)
+ * Header yang ditambahkan ke setiap response:
+ *   X-Benchmark-ResponseTime  – waktu server (ms)
+ *   X-Benchmark-QueryCount    – jumlah query DB
+ *   X-Benchmark-QueryTime     – total waktu query (ms)
+ *   X-Benchmark-Memory        – peak memory PHP (MB)
  *
- * Aktifkan dengan menambahkan di .env:
+ * Header ini dibaca langsung oleh BenchmarkRun command via cURL
+ * sehingga tidak ada dependency filesystem antar proses.
+ *
+ * Aktifkan di .env:
  *   BENCHMARK_ENABLED=true
  *   BENCHMARK_BRANCH=lazy-nocache   (atau eager-redis)
  *
- * Output CSV: storage/logs/benchmark.csv
+ * Log CSV tetap ditulis ke: storage/logs/benchmark.csv
  */
 class BenchmarkMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // Hanya aktif jika BENCHMARK_ENABLED=true
         if (! config('benchmark.enabled', false)) {
             return $next($request);
         }
 
-        // Catat waktu mulai dan baseline memory sebelum request diproses
-        $startTime   = defined('LARAVEL_START') ? LARAVEL_START : microtime(true);
-        $queryLog    = [];
+        $startTime = defined('LARAVEL_START') ? LARAVEL_START : microtime(true);
 
-        // Aktifkan query logging
         DB::enableQueryLog();
 
         $response = $next($request);
 
-        // Kumpulkan data setelah response dibuat
-        $queryLog      = DB::getQueryLog();
-        $endTime       = microtime(true);
-        $responseTime  = round(($endTime - $startTime) * 1000, 2);   // ms
-        $queryCount    = count($queryLog);
-        $queryTotalMs  = round(array_sum(array_column($queryLog, 'time')), 2);
-        $memoryPeakMb  = round(memory_get_peak_usage(true) / 1024 / 1024, 3); // MB
+        // ── Kumpulkan metrik ───────────────────────────────────────────
+        $queryLog     = DB::getQueryLog();
+        $endTime      = microtime(true);
+        $responseTime = round(($endTime - $startTime) * 1000, 2);
+        $queryCount   = count($queryLog);
+        $queryTotalMs = round(array_sum(array_column($queryLog, 'time')), 2);
+        $memoryPeakMb = round(memory_get_peak_usage(true) / 1024 / 1024, 3);
 
         DB::disableQueryLog();
 
+        // ── Sisipkan sebagai response header (dibaca cURL) ─────────────
+        $response->headers->set('X-Benchmark-ResponseTime', $responseTime);
+        $response->headers->set('X-Benchmark-QueryCount',   $queryCount);
+        $response->headers->set('X-Benchmark-QueryTime',    $queryTotalMs);
+        $response->headers->set('X-Benchmark-Memory',       $memoryPeakMb);
+
+        // ── Catat ke CSV (untuk audit manual / browser) ────────────────
         $this->writeToCsv([
             'timestamp'      => now()->toIso8601String(),
             'branch'         => config('benchmark.branch', 'unknown'),
@@ -72,15 +74,14 @@ class BenchmarkMiddleware
 
     private function writeToCsv(array $data): void
     {
-        $path    = storage_path('logs/benchmark.csv');
-        $isNew   = ! file_exists($path);
-        $handle  = fopen($path, 'a');
+        $path   = storage_path('logs/benchmark.csv');
+        $isNew  = ! file_exists($path);
+        $handle = fopen($path, 'a');
 
         if (! $handle) {
             return;
         }
 
-        // Tulis header hanya jika file baru
         if ($isNew) {
             fputcsv($handle, array_keys($data));
         }

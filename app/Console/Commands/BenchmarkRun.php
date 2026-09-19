@@ -5,15 +5,15 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 
 /**
- * Artisan command untuk menjalankan benchmark HTTP sederhana.
+ * Artisan command untuk menjalankan benchmark HTTP.
  *
  * Cara pakai:
  *   php artisan benchmark:run /products/sepatu-record-001 --n=30 --warmup=3
  *
  * Opsi:
- *   --n        Jumlah request yang dikirim (default: 20)
+ *   --n        Jumlah request yang diukur (default: 20)
  *   --warmup   Jumlah request pemanasan yang tidak dihitung (default: 2)
- *   --branch   Label branch untuk output (default: dari .env BENCHMARK_BRANCH)
+ *   --branch   Label branch/skenario (default: dari .env BENCHMARK_BRANCH)
  *   --delay    Jeda antar request dalam milidetik (default: 100)
  */
 class BenchmarkRun extends Command
@@ -29,23 +29,30 @@ class BenchmarkRun extends Command
 
     public function handle(): int
     {
-        $path     = $this->argument('url');
-        $n        = (int) $this->option('n');
-        $warmup   = (int) $this->option('warmup');
-        $branch   = $this->option('branch') ?: config('benchmark.branch', 'unknown');
-        $delayMs  = (int) $this->option('delay');
-        $baseUrl  = rtrim(config('app.url'), '/');
-        $url      = $baseUrl . '/' . ltrim($path, '/');
+        $path    = $this->argument('url');
+        $n       = (int) $this->option('n');
+        $warmup  = (int) $this->option('warmup');
+        $branch  = $this->option('branch') ?: config('benchmark.branch', 'unknown');
+        $delayMs = (int) $this->option('delay');
+        $baseUrl = rtrim(config('app.url'), '/');
+        $url     = $baseUrl . '/' . ltrim($path, '/');
 
-        $this->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        $this->info("  BENCHMARK: <fg=yellow>{$branch}</>");
-        $this->info("  URL      : {$url}");
-        $this->info("  Iterasi  : {$n} request  |  Warmup: {$warmup} request");
-        $this->info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        // ── Pastikan middleware aktif ───────────────────────────────────
+        if (! config('benchmark.enabled', false)) {
+            $this->error('BENCHMARK_ENABLED belum di-set ke true di .env!');
+            $this->line('Tambahkan: BENCHMARK_ENABLED=true lalu jalankan: php artisan config:clear');
+            return self::FAILURE;
+        }
+
+        $this->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        $this->info("  BENCHMARK : <fg=yellow>{$branch}</>");
+        $this->info("  URL       : {$url}");
+        $this->info("  Iterasi   : {$n} request  |  Warmup: {$warmup} request");
+        $this->info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         // ── Warmup ─────────────────────────────────────────────────────
         if ($warmup > 0) {
-            $this->line("<fg=gray>Warmup {$warmup} request...</>");
+            $this->line("<fg=gray>Warmup {$warmup} request (tidak dihitung)...</>");
             for ($i = 0; $i < $warmup; $i++) {
                 $this->sendRequest($url);
                 usleep($delayMs * 1000);
@@ -62,10 +69,15 @@ class BenchmarkRun extends Command
         $bar->start();
 
         for ($i = 1; $i <= $n; $i++) {
-            $result = $this->sendRequest($url);
+            $result    = $this->sendRequest($url);
             $results[] = $result;
 
-            $bar->setMessage("response: {$result['response_time_ms']}ms | query: {$result['query_count']}");
+            $bar->setMessage(sprintf(
+                'rt: %sms | q: %s | mem: %sMB',
+                $result['response_time_ms'],
+                $result['query_count'],
+                $result['memory_peak_mb']
+            ));
             $bar->advance();
 
             if ($i < $n) {
@@ -77,21 +89,24 @@ class BenchmarkRun extends Command
         $bar->finish();
         $this->newLine(2);
 
-        // ── Hitung statistik ───────────────────────────────────────────
+        // ── Tampilkan statistik ────────────────────────────────────────
         $responseTimes = array_column($results, 'response_time_ms');
         $queryCounts   = array_column($results, 'query_count');
         $queryTimes    = array_column($results, 'query_time_ms');
         $memories      = array_column($results, 'memory_peak_mb');
         $loadingTimes  = array_column($results, 'loading_time_ms');
 
-        $this->printStats("RESPONSE TIME (ms)", $responseTimes);
-        $this->printStats("QUERY COUNT", $queryCounts, 0);
-        $this->printStats("QUERY EXEC TIME (ms)", $queryTimes);
-        $this->printStats("MEMORY PEAK (MB)", $memories, 3);
-        $this->printStats("LOADING TIME / TTFB (ms)", $loadingTimes);
+        $this->printStats('RESPONSE TIME (ms)',      $responseTimes);
+        $this->printStats('QUERY COUNT',             $queryCounts,  0);
+        $this->printStats('QUERY EXEC TIME (ms)',    $queryTimes);
+        $this->printStats('MEMORY PEAK (MB)',        $memories,     3);
+        $this->printStats('LOADING TIME / TTFB (ms)', $loadingTimes);
 
         // ── Simpan ke CSV ──────────────────────────────────────────────
-        $this->saveSummaryCsv($branch, $path, $n, $responseTimes, $queryCounts, $queryTimes, $memories, $loadingTimes);
+        $this->saveSummaryCsv(
+            $branch, $path, $n,
+            $responseTimes, $queryCounts, $queryTimes, $memories, $loadingTimes
+        );
 
         $this->info("\n✅ Hasil disimpan ke: <fg=cyan>storage/logs/benchmark_summary.csv</>");
 
@@ -99,63 +114,52 @@ class BenchmarkRun extends Command
     }
 
     /**
-     * Kirim HTTP request dan ukur metriknya menggunakan cURL.
+     * Kirim satu HTTP request via cURL dan baca metrik dari response header
+     * X-Benchmark-* yang diset oleh BenchmarkMiddleware.
      */
     private function sendRequest(string $url): array
     {
-        $ch = curl_init($url);
+        $responseHeaders = [];
 
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT        => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_HTTPHEADER     => ['Accept: text/html'],
-            // Catat waktu dari perspektif client (TTFB = Time To First Byte)
-            CURLINFO_HEADER_OUT    => true,
+            // Aktifkan penerimaan header dalam response
+            CURLOPT_HEADER         => true,
+            // Callback untuk setiap baris header yang diterima
+            CURLOPT_HEADERFUNCTION => function ($ch, $headerLine) use (&$responseHeaders) {
+                $trimmed = trim($headerLine);
+                if (str_contains($trimmed, ':')) {
+                    [$name, $value] = explode(':', $trimmed, 2);
+                    $responseHeaders[strtolower(trim($name))] = trim($value);
+                }
+                return strlen($headerLine);
+            },
         ]);
 
-        $start    = microtime(true);
-        $body     = curl_exec($ch);
-        $end      = microtime(true);
-        $info     = curl_getinfo($ch);
-
+        $start  = microtime(true);
+        curl_exec($ch);
+        $end    = microtime(true);
+        $info   = curl_getinfo($ch);
         curl_close($ch);
 
-        $totalMs   = round(($end - $start) * 1000, 2);
-        $ttfbMs    = round($info['starttransfer_time'] * 1000, 2);  // TTFB
-        $httpCode  = $info['http_code'] ?? 0;
+        $totalMs  = round(($end - $start) * 1000, 2);
+        $ttfbMs   = round(($info['starttransfer_time'] ?? 0) * 1000, 2);
 
-        // Coba baca metrik dari response header X-Benchmark-* yang diset middleware
-        $memoryMb  = 0.0;
-        $queryCount = 0;
-        $queryTimeMs = 0.0;
-
-        // Parse header dari curl untuk baca X-Benchmark-* header
-        if (isset($info['request_header'])) {
-            // Header response tidak tersedia langsung dari curl_getinfo untuk CURLOPT_RETURNTRANSFER
-            // Kita parse dari body jika ada meta tag benchmark, atau baca dari CSV log
-        }
-
-        // Baca baris terakhir dari CSV log yang ditulis middleware
-        $csvPath = storage_path('logs/benchmark.csv');
-        if (file_exists($csvPath)) {
-            $lines = file($csvPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            if (count($lines) > 1) {
-                $last = str_getcsv(end($lines));
-                // header: timestamp, branch, url, method, status, response_time, query_count, query_time_ms, memory_peak_mb
-                if (count($last) >= 9) {
-                    $queryCount   = (int)   $last[6];
-                    $queryTimeMs  = (float) $last[7];
-                    $memoryMb     = (float) $last[8];
-                }
-            }
-        }
+        // Baca metrik dari header X-Benchmark-* yang diset middleware
+        $queryCount   = (int)   ($responseHeaders['x-benchmark-querycount']   ?? 0);
+        $queryTimeMs  = (float) ($responseHeaders['x-benchmark-querytime']    ?? 0.0);
+        $memoryMb     = (float) ($responseHeaders['x-benchmark-memory']       ?? 0.0);
+        $serverRtMs   = (float) ($responseHeaders['x-benchmark-responsetime'] ?? $totalMs);
 
         return [
-            'http_code'        => $httpCode,
-            'response_time_ms' => $totalMs,
-            'loading_time_ms'  => $ttfbMs,  // TTFB dari perspektif client
+            'http_code'        => $info['http_code'] ?? 0,
+            'response_time_ms' => $serverRtMs,   // waktu server (dari header middleware)
+            'loading_time_ms'  => $ttfbMs,        // TTFB dari perspektif client (cURL)
             'query_count'      => $queryCount,
             'query_time_ms'    => $queryTimeMs,
             'memory_peak_mb'   => $memoryMb,
@@ -164,16 +168,20 @@ class BenchmarkRun extends Command
 
     private function printStats(string $label, array $values, int $decimals = 2): void
     {
-        if (empty($values)) return;
+        if (empty($values)) {
+            return;
+        }
 
-        sort($values);
-        $count  = count($values);
-        $min    = round(min($values), $decimals);
-        $max    = round(max($values), $decimals);
-        $avg    = round(array_sum($values) / $count, $decimals);
-        $p50    = round($values[(int) floor($count * 0.50)], $decimals);
-        $p90    = round($values[(int) floor($count * 0.90)], $decimals);
-        $p95    = round($values[(int) floor($count * 0.95)], $decimals);
+        $sorted = $values;
+        sort($sorted);
+        $count = count($sorted);
+
+        $min = round(min($sorted), $decimals);
+        $max = round(max($sorted), $decimals);
+        $avg = round(array_sum($sorted) / $count, $decimals);
+        $p50 = round($sorted[(int) floor($count * 0.50)], $decimals);
+        $p90 = round($sorted[(int) floor($count * 0.90)], $decimals);
+        $p95 = round($sorted[min((int) floor($count * 0.95), $count - 1)], $decimals);
 
         $this->line("<fg=cyan;options=bold>  {$label}</>");
         $this->table(
@@ -196,7 +204,9 @@ class BenchmarkRun extends Command
         $isNew = ! file_exists($file);
         $fh    = fopen($file, 'a');
 
-        if (! $fh) return;
+        if (! $fh) {
+            return;
+        }
 
         $headers = [
             'timestamp', 'branch', 'url', 'n',
@@ -207,21 +217,35 @@ class BenchmarkRun extends Command
             'ttfb_min', 'ttfb_avg', 'ttfb_p50', 'ttfb_p90', 'ttfb_max',
         ];
 
-        if ($isNew) fputcsv($fh, $headers);
+        if ($isNew) {
+            fputcsv($fh, $headers);
+        }
 
-        $avg = fn($arr) => $arr ? round(array_sum($arr) / count($arr), 2) : 0;
-        $p   = function (array $arr, float $pct): float {
+        $avg = fn (array $arr) => $arr
+            ? round(array_sum($arr) / count($arr), 2)
+            : 0;
+
+        $p = function (array $arr, float $pct): float {
             sort($arr);
-            return round($arr[(int) floor(count($arr) * $pct)], 2);
+            return round($arr[min((int) floor(count($arr) * $pct), count($arr) - 1)], 2);
         };
 
         fputcsv($fh, [
             now()->toIso8601String(), $branch, $path, $n,
-            round(min($responseTimes), 2), $avg($responseTimes), $p($responseTimes, .50), $p($responseTimes, .90), $p($responseTimes, .95), round(max($responseTimes), 2),
+            // response time
+            round(min($responseTimes), 2), $avg($responseTimes),
+            $p($responseTimes, .50), $p($responseTimes, .90), $p($responseTimes, .95),
+            round(max($responseTimes), 2),
+            // query count
             min($queryCounts), $avg($queryCounts), max($queryCounts),
+            // query time
             round(min($queryTimes), 2), $avg($queryTimes), round(max($queryTimes), 2),
+            // memory
             round(min($memories), 3), $avg($memories), round(max($memories), 3),
-            round(min($loadingTimes), 2), $avg($loadingTimes), $p($loadingTimes, .50), $p($loadingTimes, .90), round(max($loadingTimes), 2),
+            // TTFB
+            round(min($loadingTimes), 2), $avg($loadingTimes),
+            $p($loadingTimes, .50), $p($loadingTimes, .90),
+            round(max($loadingTimes), 2),
         ]);
 
         fclose($fh);
