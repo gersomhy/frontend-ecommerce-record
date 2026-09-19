@@ -42,7 +42,7 @@ class ProductCacheService
      */
     public function getKategoriAktif(): Collection
     {
-        return Cache::tags(['categories'])->remember(
+        return Cache::store('redis')->tags(['categories'])->remember(
             'categories.aktif',
             self::TTL_KATEGORI,
             fn () => Category::active()
@@ -57,7 +57,7 @@ class ProductCacheService
      */
     public function getKategoriSidebar(): Collection
     {
-        return Cache::tags(['categories'])->remember(
+        return Cache::store('redis')->tags(['categories'])->remember(
             'categories.sidebar',
             self::TTL_KATEGORI,
             fn () => Category::active()->ordered()->get()
@@ -73,7 +73,7 @@ class ProductCacheService
      */
     public function getFeaturedProducts(int $limit = 8): Collection
     {
-        return Cache::tags(['products'])->remember(
+        return Cache::store('redis')->tags(['products'])->remember(
             "products.featured.{$limit}",
             self::TTL_PRODUK,
             fn () => Product::active()
@@ -91,7 +91,7 @@ class ProductCacheService
      */
     public function getNewArrivals(int $limit = 8): Collection
     {
-        return Cache::tags(['products'])->remember(
+        return Cache::store('redis')->tags(['products'])->remember(
             "products.new_arrivals.{$limit}",
             self::TTL_PRODUK,
             fn () => Product::active()
@@ -117,7 +117,7 @@ class ProductCacheService
     {
         $cacheKey = $this->buildKatalogKey($request);
 
-        return Cache::tags(['products', 'catalog'])->remember(
+        return Cache::store('redis')->tags(['products', 'catalog'])->remember(
             $cacheKey,
             self::TTL_KATALOG,
             function () use ($request, $perPage) {
@@ -161,7 +161,7 @@ class ProductCacheService
         $page     = $request->get('page', 1);
         $cacheKey = "catalog.category.{$category->slug}.sort:{$sort}.page:{$page}";
 
-        return Cache::tags(['products', 'catalog', "category:{$category->slug}"])->remember(
+        return Cache::store('redis')->tags(['products', 'catalog', "category:{$category->slug}"])->remember(
             $cacheKey,
             self::TTL_KATALOG,
             function () use ($category, $request, $sort, $perPage) {
@@ -192,7 +192,7 @@ class ProductCacheService
     {
         $cacheKey = "products.related.{$product->id}.limit:{$limit}";
 
-        return Cache::tags(['products'])->remember(
+        return Cache::store('redis')->tags(['products'])->remember(
             $cacheKey,
             self::TTL_PRODUK,
             fn () => Product::active()
@@ -229,7 +229,7 @@ class ProductCacheService
     {
         $cacheKey = "product.detail.{$product->id}";
 
-        return Cache::tags(['products'])->remember(
+        return Cache::store('redis')->tags(['products'])->remember(
             $cacheKey,
             self::TTL_PRODUK,
             fn () => $product->load([
@@ -251,7 +251,7 @@ class ProductCacheService
      */
     public function flushProducts(): void
     {
-        Cache::tags(['products'])->flush();
+        Cache::store('redis')->tags(['products'])->flush();
     }
 
     /**
@@ -259,7 +259,7 @@ class ProductCacheService
      */
     public function flushCategories(): void
     {
-        Cache::tags(['categories'])->flush();
+        Cache::store('redis')->tags(['categories'])->flush();
     }
 
     /**
@@ -267,7 +267,7 @@ class ProductCacheService
      */
     public function flushKategoriTertentu(string $slug): void
     {
-        Cache::tags(["category:{$slug}"])->flush();
+        Cache::store('redis')->tags(["category:{$slug}"])->flush();
     }
 
     /**
@@ -275,7 +275,7 @@ class ProductCacheService
      */
     public function flushSemua(): void
     {
-        Cache::tags(['products', 'categories', 'catalog'])->flush();
+        Cache::store('redis')->tags(['products', 'categories', 'catalog'])->flush();
     }
 
     // ──────────────────────────────────────────────────────────────────────
