@@ -32,15 +32,16 @@ class BenchmarkRun extends Command
         $branch  = $this->option('branch') ?: config('benchmark.branch', 'unknown');
         $delayMs = (int) $this->option('delay');
 
-        // Otomatis pilih produk yang ada jika URL tidak diisi
-        if (! $path) {
+        // Otomatis pilih produk yang ada jika URL tidak diisi atau jika user memasukkan placeholder {slug}
+        if (! $path || str_contains($path, '{slug}') || str_contains($path, '{') || $path === '/products/' || $path === 'products/') {
             $product = Product::active()->first() ?? Product::first();
             if ($product) {
                 $path = '/products/' . $product->slug;
-                $this->comment("ℹ️  URL tidak ditentukan, otomatis menguji produk: <fg=white>{$product->name}</>");
+                $this->comment("ℹ️  Placeholder terdeteksi, otomatis menggunakan slug produk nyata dari database:");
+                $this->line("   <fg=cyan>{$path}</> ({$product->name})");
             } else {
                 $path = '/products';
-                $this->comment("ℹ️  URL tidak ditentukan, otomatis menguji katalog: <fg=white>/products</>");
+                $this->comment("ℹ️  Otomatis menguji katalog: <fg=white>/products</>");
             }
         }
 
