@@ -71,6 +71,7 @@ class ProductController extends Controller
         }
 
         $ulasan = $product->reviewsTampil()
+            ->with(['user:id,name', 'orderItem:id,variant_info'])
             ->when($saringBintang > 0, fn ($q) => $q->where('rating', $saringBintang))
             ->latest()
             ->paginate(8, ['*'], 'ulasan');
