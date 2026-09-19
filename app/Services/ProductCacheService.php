@@ -206,6 +206,42 @@ class ProductCacheService
         );
     }
 
+    /**
+     * Ambil data lengkap satu produk (dengan semua relasi) untuk halaman detail.
+     *
+     * Strategi:
+     *  - Cache key: product.detail.{id} — unik per produk.
+     *  - Tag: 'products' — saat Observer memflush tag ini (create/update/delete),
+     *    cache detail produk yang bersangkutan ikut terhapus otomatis.
+     *  - TTL: sama dengan TTL_PRODUK (10 menit).
+     *
+     * Relasi yang di-eager load dan disimpan ke Redis:
+     *  - category          → untuk breadcrumb & label kategori
+     *  - images            → untuk galeri foto produk
+     *  - variants          → untuk pilihan ukuran & warna
+     *  - variants.activeDiscount → untuk harga diskon per varian
+     *  - activeDiscount    → untuk diskon level produk & countdown
+     *
+     * Pada cache hit: tidak ada query DB sama sekali untuk relasi di atas.
+     * Pada cache miss: 1 query produk + 4 query relasi (eager), lalu disimpan ke Redis.
+     */
+    public function getDetailProduk(Product $product): Product
+    {
+        $cacheKey = "product.detail.{$product->id}";
+
+        return Cache::tags(['products'])->remember(
+            $cacheKey,
+            self::TTL_PRODUK,
+            fn () => $product->load([
+                'category',
+                'images',
+                'variants.activeDiscount',
+                'activeDiscount',
+            ])
+        );
+    }
+
+
     // ──────────────────────────────────────────────────────────────────────
     // Cache Invalidation
     // ──────────────────────────────────────────────────────────────────────

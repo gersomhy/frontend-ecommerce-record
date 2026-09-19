@@ -35,19 +35,41 @@ class ProductController extends Controller
 
     /**
      * Tampilkan halaman detail satu produk.
-     * Relasi produk di-load langsung (tidak di-cache) karena datanya spesifik
-     * per slug dan sudah dipercepat oleh eager loading.
-     * Produk terkait di-cache via ProductCacheService.
+     *
+     * ┌─────────────────────────────────────────────────────────────────┐
+     * │  STRATEGI: EAGER LOADING + REDIS CACHE                          │
+     * │                                                                 │
+     * │  Cache hit  (request ke-2 dst, dalam TTL 10 menit):            │
+     * │   • Produk + semua relasi langsung dari Redis — 0 query DB      │
+     * │   • Produk terkait dari Redis — 0 query DB                     │
+     * │   • Total query DB: 0 (hanya ulasan, karena tidak di-cache)     │
+     * │                                                                 │
+     * │  Cache miss (request pertama / setelah cache di-flush):         │
+     * │   • Route model binding: 1 query (SELECT produk by slug)        │
+     * │   • Eager load relasi: 4 query                                  │
+     * │     – category, images, variants, activeDiscount                │
+     * │   • variants.activeDiscount: sudah termasuk dalam variants load  │
+     * │   • Produk terkait: 1 query (dengan eager relasi sekaligus)     │
+     * │   • Hasilnya disimpan ke Redis → request berikutnya 0 query     │
+     * │                                                                 │
+     * │  Ulasan tidak di-cache karena bergantung pada filter bintang    │
+     * │  dan paginasi yang unik per user/request.                       │
+     * └─────────────────────────────────────────────────────────────────┘
      */
     public function show(Product $product)
     {
-        $product->load(['category', 'images', 'variants.activeDiscount', 'activeDiscount']);
+        // Eager load semua relasi produk dari Redis (atau DB jika cache miss),
+        // lalu simpan hasilnya ke Redis untuk request berikutnya.
+        $product = $this->cacheService->getDetailProduk($product);
+
         CatatAktivitas::tulisProdukView($product);
 
+        // Produk terkait — juga di-cache Redis per product ID.
         $relatedProducts = $this->cacheService->getRelatedProducts($product);
 
-        // Ulasan produk — tidak di-cache karena bergantung pada filter bintang
-        // dan paginasi yang bervariasi per user.
+        // ── Ulasan produk ─────────────────────────────────────────────
+        // Tidak di-cache karena bergantung pada filter bintang dan
+        // paginasi yang bervariasi per user.
         $saringBintang = (int) request()->query('bintang', 0);
         if ($saringBintang < 1 || $saringBintang > 5) {
             $saringBintang = 0;
@@ -59,9 +81,9 @@ class ProductController extends Controller
             ->latest()
             ->paginate(8, ['*'], 'ulasan');
 
-        // Sebaran sengaja TIDAK ikut disaring: angkanya adalah menu pilihan
-        // itu sendiri, dan menu yang menyusut begitu dipakai membuat
-        // pengunjung tidak bisa berpindah ke bintang lain.
+        // Sebaran bintang — sengaja TIDAK ikut disaring (lihat komentar di bawah).
+        // Angka sebaran adalah menu pilihan itu sendiri; jika ikut tersaring,
+        // menu menyusut dan pembeli tidak bisa berpindah ke bintang lain.
         $sebaran = $product->reviewsTampil()
             ->selectRaw('rating, COUNT(*) as jumlah')
             ->groupBy('rating')
@@ -69,9 +91,8 @@ class ProductController extends Controller
 
         $jumlahUlasan = (int) $sebaran->sum();
 
-        // map() meneruskan nilai DAN kuncinya, jadi bintangnya (kunci) bisa
-        // dikalikan jumlahnya (nilai). sum() dengan fungsi hanya menerima
-        // nilainya saja, dan di sini kuncinya justru yang dibutuhkan.
+        // Rata-rata bintang dihitung di PHP dari $sebaran yang sudah ada
+        // (bukan query tambahan) — map() meneruskan nilai DAN kuncinya.
         $bintangRata = $jumlahUlasan > 0
             ? round($sebaran->map(fn ($jumlah, $bintang) => $jumlah * $bintang)->sum() / $jumlahUlasan, 1)
             : 0.0;
@@ -82,3 +103,4 @@ class ProductController extends Controller
         ));
     }
 }
+

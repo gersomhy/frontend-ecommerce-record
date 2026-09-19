@@ -162,17 +162,42 @@ class Product extends Model
 
     /**
      * Get available sizes (unique from variants).
+     *
+     * Jika relasi variants sudah di-load (eager/cache), ambil dari koleksi
+     * yang ada di memori — tanpa query DB tambahan.
+     * Fallback ke query jika relasi belum di-load (tidak terjadi di eager-redis).
      */
     public function getAvailableSizesAttribute(): array
     {
+        if ($this->relationLoaded('variants')) {
+            return $this->variants
+                ->pluck('size')
+                ->unique()
+                ->sort()
+                ->values()
+                ->toArray();
+        }
+
         return $this->variants()->distinct()->pluck('size')->sort()->values()->toArray();
     }
 
     /**
      * Get available colors (unique from variants).
+     *
+     * Jika relasi variants sudah di-load (eager/cache), ambil dari koleksi
+     * yang ada di memori — tanpa query DB tambahan.
+     * Fallback ke query jika relasi belum di-load (tidak terjadi di eager-redis).
      */
     public function getAvailableColorsAttribute(): array
     {
+        if ($this->relationLoaded('variants')) {
+            return $this->variants
+                ->map(fn ($v) => ['color' => $v->color, 'color_hex' => $v->color_hex])
+                ->unique('color')
+                ->values()
+                ->toArray();
+        }
+
         return $this->variants()
             ->select('color', 'color_hex')
             ->distinct()
