@@ -44,20 +44,31 @@ class AppServiceProvider extends ServiceProvider
         Category::observe(CategoryObserver::class);
 
         // ── View Composer ────────────────────────────────────────────────
-        // Gunakan ProductCacheService agar data categories dimuat dari Redis,
-        // bukan dari query DB setiap request.
+        // Gunakan ProductCacheService agar data categories dimuat dari Redis.
+        // Di-memoize per request cycle (via request ID) agar tidak dieksekusi berulang
+        // saat sub-views (navbar, layouts, content) di-render dalam satu halaman yang sama.
         \Illuminate\Support\Facades\View::composer(
             ['layouts.app', 'components.navbar', 'home', 'products.index', 'products.show'],
             function ($view) {
-                /** @var ProductCacheService $cacheService */
-                $cacheService = app(ProductCacheService::class);
+                static $lastRequestId = null;
+                static $sharedData = null;
 
-                $view->with('categories', $cacheService->getKategoriAktif());
+                $currentRequestId = spl_object_id(request());
+                if ($lastRequestId !== $currentRequestId || $sharedData === null) {
+                    $lastRequestId = $currentRequestId;
 
-                $cartService = app(\App\Services\CartService::class);
-                $view->with('cartCount', $cartService->getCartCount());
+                    /** @var ProductCacheService $cacheService */
+                    $cacheService = app(ProductCacheService::class);
+                    $cartService  = app(\App\Services\CartService::class);
 
-                $view->with('pembelianTerbaru', app(\App\Services\PembelianTerbaruService::class)->ambil());
+                    $sharedData = [
+                        'categories'       => $cacheService->getKategoriAktif(),
+                        'cartCount'        => $cartService->getCartCount(),
+                        'pembelianTerbaru' => app(\App\Services\PembelianTerbaruService::class)->ambil(),
+                    ];
+                }
+
+                $view->with($sharedData);
             }
         );
     }

@@ -32,6 +32,10 @@ class ProductCacheService
     /** TTL untuk halaman katalog produk (filter + pagination). */
     public const TTL_KATALOG = 300;     // 5 menit
 
+    /** Memoize kategori aktif di memori PHP per request cycle untuk hindari multiple round-trip ke Redis. */
+    private ?Collection $kategoriAktifMemo = null;
+    private ?Collection $kategoriSidebarMemo = null;
+
     // ──────────────────────────────────────────────────────────────────────
     // Kategori
     // ──────────────────────────────────────────────────────────────────────
@@ -42,7 +46,11 @@ class ProductCacheService
      */
     public function getKategoriAktif(): Collection
     {
-        return Cache::store('redis')->tags(['categories'])->remember(
+        if ($this->kategoriAktifMemo !== null) {
+            return $this->kategoriAktifMemo;
+        }
+
+        return $this->kategoriAktifMemo = Cache::store('redis')->tags(['categories'])->remember(
             'categories.aktif',
             self::TTL_KATEGORI,
             fn () => Category::active()
@@ -57,7 +65,11 @@ class ProductCacheService
      */
     public function getKategoriSidebar(): Collection
     {
-        return Cache::store('redis')->tags(['categories'])->remember(
+        if ($this->kategoriSidebarMemo !== null) {
+            return $this->kategoriSidebarMemo;
+        }
+
+        return $this->kategoriSidebarMemo = Cache::store('redis')->tags(['categories'])->remember(
             'categories.sidebar',
             self::TTL_KATEGORI,
             fn () => Category::active()->ordered()->get()
@@ -117,7 +129,7 @@ class ProductCacheService
     {
         $cacheKey = $this->buildKatalogKey($request);
 
-        return Cache::store('redis')->tags(['products', 'catalog'])->remember(
+        $paginator = Cache::store('redis')->tags(['products', 'catalog'])->remember(
             $cacheKey,
             self::TTL_KATALOG,
             function () use ($request, $perPage) {
@@ -150,6 +162,10 @@ class ProductCacheService
                 return $query->paginate($perPage)->withQueryString();
             }
         );
+
+        $this->linkPaginatorVariants($paginator);
+
+        return $paginator;
     }
 
     /**
@@ -161,7 +177,7 @@ class ProductCacheService
         $page     = $request->get('page', 1);
         $cacheKey = "catalog.category.{$category->slug}.sort:{$sort}.page:{$page}";
 
-        return Cache::store('redis')->tags(['products', 'catalog', "category:{$category->slug}"])->remember(
+        $paginator = Cache::store('redis')->tags(['products', 'catalog', "category:{$category->slug}"])->remember(
             $cacheKey,
             self::TTL_KATALOG,
             function () use ($category, $request, $sort, $perPage) {
@@ -179,6 +195,10 @@ class ProductCacheService
                 return $query->paginate($perPage)->withQueryString();
             }
         );
+
+        $this->linkPaginatorVariants($paginator);
+
+        return $paginator;
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -192,7 +212,7 @@ class ProductCacheService
     {
         $cacheKey = "products.related.{$product->id}.limit:{$limit}";
 
-        return Cache::store('redis')->tags(['products'])->remember(
+        $related = Cache::store('redis')->tags(['products'])->remember(
             $cacheKey,
             self::TTL_PRODUK,
             fn () => Product::active()
@@ -204,6 +224,10 @@ class ProductCacheService
                 ->take($limit)
                 ->get()
         );
+
+        $this->linkCollectionVariants($related);
+
+        return $related;
     }
 
     /**
@@ -229,16 +253,25 @@ class ProductCacheService
     {
         $cacheKey = "product.detail.{$product->id}";
 
-        return Cache::store('redis')->tags(['products'])->remember(
+        $cachedProduct = Cache::store('redis')->tags(['products'])->remember(
             $cacheKey,
             self::TTL_PRODUK,
-            fn () => $product->load([
-                'category',
-                'images',
-                'variants.activeDiscount',
-                'activeDiscount',
-            ])
+            function () use ($product) {
+                $product->load([
+                    'category',
+                    'images',
+                    'variants.activeDiscount',
+                    'activeDiscount',
+                ]);
+                $this->linkProductVariants($product);
+
+                return $product;
+            }
         );
+
+        $this->linkProductVariants($cachedProduct);
+
+        return $cachedProduct;
     }
 
 
@@ -259,6 +292,8 @@ class ProductCacheService
      */
     public function flushCategories(): void
     {
+        $this->kategoriAktifMemo   = null;
+        $this->kategoriSidebarMemo = null;
         Cache::store('redis')->tags(['categories'])->flush();
     }
 
@@ -275,12 +310,37 @@ class ProductCacheService
      */
     public function flushSemua(): void
     {
+        $this->kategoriAktifMemo   = null;
+        $this->kategoriSidebarMemo = null;
         Cache::store('redis')->tags(['products', 'categories', 'catalog'])->flush();
     }
 
     // ──────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Hubungkan relasi inverse product ke setiap variant di memori
+     * agar blade/accessor tidak memicu lazy query N+1 ke database.
+     */
+    public function linkProductVariants(Product $product): void
+    {
+        if ($product->relationLoaded('variants')) {
+            $product->variants->each(function ($variant) use ($product) {
+                $variant->setRelation('product', $product);
+            });
+        }
+    }
+
+    public function linkCollectionVariants(Collection $products): void
+    {
+        $products->each(fn ($p) => $this->linkProductVariants($p));
+    }
+
+    public function linkPaginatorVariants(LengthAwarePaginator $paginator): void
+    {
+        $paginator->getCollection()->each(fn ($p) => $this->linkProductVariants($p));
+    }
 
     /**
      * Buat cache key unik untuk halaman katalog berdasarkan parameter request.
