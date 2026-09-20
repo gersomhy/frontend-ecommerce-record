@@ -85,7 +85,7 @@ class ProductCacheService
      */
     public function getFeaturedProducts(int $limit = 8): Collection
     {
-        return Cache::store('redis')->tags(['products'])->remember(
+        $products = Cache::store('redis')->tags(['products'])->remember(
             "products.featured.{$limit}",
             self::TTL_PRODUK,
             fn () => Product::active()
@@ -96,6 +96,10 @@ class ProductCacheService
                 ->take($limit)
                 ->get()
         );
+
+        $this->linkCollectionVariants($products);
+
+        return $products;
     }
 
     /**
@@ -103,7 +107,7 @@ class ProductCacheService
      */
     public function getNewArrivals(int $limit = 8): Collection
     {
-        return Cache::store('redis')->tags(['products'])->remember(
+        $products = Cache::store('redis')->tags(['products'])->remember(
             "products.new_arrivals.{$limit}",
             self::TTL_PRODUK,
             fn () => Product::active()
@@ -114,6 +118,10 @@ class ProductCacheService
                 ->take($limit)
                 ->get()
         );
+
+        $this->linkCollectionVariants($products);
+
+        return $products;
     }
 
     // ──────────────────────────────────────────────────────────────────────
