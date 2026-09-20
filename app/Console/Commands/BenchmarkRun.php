@@ -102,9 +102,10 @@ class BenchmarkRun extends Command
             $results[] = $result;
 
             $bar->setMessage(sprintf(
-                'rt: %sms | q: %s | mem: %sMB',
+                'rt: %sms | q: %s | cpu: %sms | mem: %sMB',
                 $result['response_time_ms'],
                 $result['query_count'],
+                $result['cpu_time_ms'],
                 $result['memory_peak_mb']
             ));
             $bar->advance();
@@ -122,19 +123,21 @@ class BenchmarkRun extends Command
         $responseTimes = array_column($results, 'response_time_ms');
         $queryCounts   = array_column($results, 'query_count');
         $queryTimes    = array_column($results, 'query_time_ms');
+        $cpuTimes      = array_column($results, 'cpu_time_ms');
         $memories      = array_column($results, 'memory_peak_mb');
         $loadingTimes  = array_column($results, 'loading_time_ms');
 
         $this->printStats('RESPONSE TIME (ms)',       $responseTimes);
         $this->printStats('QUERY COUNT',              $queryCounts,  0);
         $this->printStats('QUERY EXEC TIME (ms)',     $queryTimes);
+        $this->printStats('CPU TIME (ms)',            $cpuTimes);
         $this->printStats('MEMORY PEAK (MB)',         $memories,     3);
         $this->printStats('LOADING TIME / TTFB (ms)', $loadingTimes);
 
         // ── Simpan ke CSV (dengan proteksi jika file sedang dibuka) ────
         $savedFile = $this->saveSummaryCsv(
             $branch, $path, $n,
-            $responseTimes, $queryCounts, $queryTimes, $memories, $loadingTimes
+            $responseTimes, $queryCounts, $queryTimes, $cpuTimes, $memories, $loadingTimes
         );
 
         if ($savedFile) {
@@ -182,6 +185,7 @@ class BenchmarkRun extends Command
         $queryCount   = (int)   ($responseHeaders['x-benchmark-querycount']   ?? 0);
         $queryTimeMs  = (float) ($responseHeaders['x-benchmark-querytime']    ?? 0.0);
         $memoryMb     = (float) ($responseHeaders['x-benchmark-memory']       ?? 0.0);
+        $cpuTimeMs    = (float) ($responseHeaders['x-benchmark-cputime']      ?? 0.0);
         $serverRtMs   = (float) ($responseHeaders['x-benchmark-responsetime'] ?? $totalMs);
 
         return [
@@ -191,6 +195,7 @@ class BenchmarkRun extends Command
             'query_count'      => $queryCount,
             'query_time_ms'    => $queryTimeMs,
             'memory_peak_mb'   => $memoryMb,
+            'cpu_time_ms'      => $cpuTimeMs,
         ];
     }
 
@@ -225,11 +230,31 @@ class BenchmarkRun extends Command
         array  $responseTimes,
         array  $queryCounts,
         array  $queryTimes,
+        array  $cpuTimes,
         array  $memories,
         array  $loadingTimes
     ): ?string {
         $primaryPath = storage_path('logs/benchmark_summary.csv');
         $targetPath  = $primaryPath;
+
+        // Pastikan header file lama kompatibel jika kolom CPU belum ada
+        if (file_exists($primaryPath) && filesize($primaryPath) > 0) {
+            $fhCheck = @fopen($primaryPath, 'r');
+            if ($fhCheck) {
+                $firstLine = fgets($fhCheck);
+                fclose($fhCheck);
+                if ($firstLine && ! str_contains($firstLine, 'cpu_avg')) {
+                    $lines = file($primaryPath);
+                    if ($lines && count($lines) > 0) {
+                        $lines[0] = rtrim($lines[0], "\r\n") . ",cpu_min,cpu_avg,cpu_p50,cpu_p90,cpu_max\n";
+                        for ($i = 1; $i < count($lines); $i++) {
+                            $lines[$i] = rtrim($lines[$i], "\r\n") . ",,,,,\n";
+                        }
+                        @file_put_contents($primaryPath, implode('', $lines));
+                    }
+                }
+            }
+        }
 
         // Buka file dengan proteksi file lock Windows (misal dibuka di Excel)
         $fh = @fopen($targetPath, 'a');
@@ -252,6 +277,7 @@ class BenchmarkRun extends Command
             'qt_min', 'qt_avg', 'qt_max',
             'mem_min', 'mem_avg', 'mem_max',
             'ttfb_min', 'ttfb_avg', 'ttfb_p50', 'ttfb_p90', 'ttfb_max',
+            'cpu_min', 'cpu_avg', 'cpu_p50', 'cpu_p90', 'cpu_max',
         ];
 
         // Tulis header hanya jika ukuran file masih 0
@@ -276,6 +302,9 @@ class BenchmarkRun extends Command
             round(min($loadingTimes), 2), $avg($loadingTimes),
             $p($loadingTimes, .50), $p($loadingTimes, .90),
             round(max($loadingTimes), 2),
+            round(min($cpuTimes), 2), $avg($cpuTimes),
+            $p($cpuTimes, .50), $p($cpuTimes, .90),
+            round(max($cpuTimes), 2),
         ]);
 
         fclose($fh);
