@@ -271,7 +271,6 @@ class ProductCacheService
                     'variants.activeDiscount',
                     'activeDiscount',
                 ]);
-                $this->linkProductVariants($product);
 
                 return $product;
             }

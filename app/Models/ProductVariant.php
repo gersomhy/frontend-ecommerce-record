@@ -27,6 +27,15 @@ class ProductVariant extends Model
     ];
 
     /**
+     * Sembunyikan relasi product saat varian di-serialize ke array / JSON
+     * untuk mencegah circular reference dan relation bloat berulang.
+     */
+    protected $hidden = [
+        'product',
+    ];
+
+
+    /**
      * Get the product that owns the variant.
      */
     public function product(): BelongsTo

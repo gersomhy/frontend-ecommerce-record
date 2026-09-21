@@ -71,7 +71,7 @@
             selectedColor: '',
             quantity: 1,
             maxStock: {{ $product->stock }},
-            variants: {{ json_encode($product->variants) }},
+            variants: {{ json_encode($product->variants->map->only(['id', 'product_id', 'size', 'color', 'color_hex', 'stock', 'price_adjustment', 'sku'])) }},
             variantId: '',
             variantStock: 0,
 
